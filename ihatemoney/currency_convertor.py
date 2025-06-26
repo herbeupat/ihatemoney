@@ -2,6 +2,7 @@ import traceback
 import warnings
 
 from cachetools import TTLCache, cached
+from flask import current_app
 import requests
 
 
@@ -17,7 +18,7 @@ class Singleton(type):
 class CurrencyConverter(object, metaclass=Singleton):
     # Get exchange rates
     no_currency = "XXX"
-    api_url = "https://api.exchangerate.host/latest?base=USD"
+    api_url = "https://api.exchangerate.host/live?source=EUR&access_key="
 
     def __init__(self):
         pass
@@ -25,7 +26,7 @@ class CurrencyConverter(object, metaclass=Singleton):
     @cached(cache=TTLCache(maxsize=1, ttl=86400))
     def get_rates(self):
         try:
-            rates = requests.get(self.api_url).json()["rates"]
+            rates = requests.get(self.api_url + current_app.config['CURRENCY_API_KEY']).json()["quotes"]
         except Exception:
             warnings.warn(
                 f"Call to {self.api_url} failed: {traceback.format_exc(limit=0).strip()}"
@@ -219,10 +220,16 @@ class CurrencyConverter(object, metaclass=Singleton):
             or dest_currency == self.no_currency
         ):
             return amount
-
         rates = self.get_rates()
-        source_rate = rates[source_currency]
-        dest_rate = rates[dest_currency]
-        new_amount = (float(amount) / source_rate) * dest_rate
+        if source_currency == "EUR":
+            dest_rate = rates["EUR" + dest_currency]
+            new_amount = float(amount) * dest_rate
+        elif dest_currency == "EUR":
+            source_rate = rates["EUR" + source_currency]
+            new_amount = float(amount) / source_rate
+        else:
+            dest_rate = rates["EUR" + dest_currency]
+            source_rate = rates["EUR" + source_currency]
+            new_amount = float(amount) * dest_rate / source_rate
         # round to two digits because we are dealing with money
         return round(new_amount, 2)

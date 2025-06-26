@@ -4,7 +4,7 @@ from re import match
 from types import SimpleNamespace
 
 import email_validator
-from flask import request
+from flask import request, current_app
 from flask_babel import lazy_gettext as _
 from flask_wtf.file import FileAllowed, FileField, FileRequired
 from flask_wtf.form import FlaskForm
@@ -430,7 +430,7 @@ class BillForm(FlaskForm):
     def validate_original_currency(self, field):
         # Workaround for currency API breakage
         # See #1232
-        if field.data not in [CurrencyConverter.no_currency, self.project_currency]:
+        if field.data not in [CurrencyConverter.no_currency, self.project_currency] and not bool(current_app.config['CURRENCY_API_KEY']):
             msg = _(
                 "Failed to convert from %(bill_currency)s currency to %(project_currency)s",
                 bill_currency=field.data,
